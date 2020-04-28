@@ -1,11 +1,10 @@
 const express = require("express");
+const db = require("./db");
 const cors = require("cors");
+const morgan = require("morgan");
 const app = express();
 
 const PORT = 4001;
-
-// if it does not work, try relative path to itellu-react ('../itellu-react')
-//app.use(express.static("itellu-react"));
 
 app.use(cors());
 
@@ -39,13 +38,67 @@ const stories = [
   },
 ];
 
+// Utility Functions
+
+const generateContactDate = (contactName) => {
+  const currentDate = new Intl.DateTimeFormat("en-GB").format(new Date());
+  let newId = `${currentDate}-${contactName}`;
+  return newId;
+};
+
+const insertIntoDatabase = (table, data) => {
+  db.run(
+    "CREATE TABLE IF NOT EXISTS contact (id INTEGER PRIMARY KEY, date_name STRING NOT NULL, name STRING, email STRING NOT NULL, message STRING)",
+    (err) => {
+      if (err) {
+        console.log(err);
+        return;
+      }
+      db.run(
+        "INSERT INTO contact (date_name, name, email, message) VALUES ($date_name, $name, $email, $message)",
+        {
+          $date_name: data.dateName,
+          $name: data.name,
+          $email: data.email,
+          $message: data.message,
+        },
+        (err) => {
+          if (err) {
+            console.log(err);
+          }
+          // call nodemailer, send mail and set column mail_sent to 1 (true)
+          console.log("Data inserted");
+        }
+      );
+    }
+  );
+};
+
+// Logging middleware morgan
+app.use(morgan("dev"));
+
+// Body Parsing middleware
+app.use(express.json());
+
 // GET all stories
 app.get("/stories", (req, res, next) => {
   res.send(stories);
 });
 
+// GET test in browser
 app.get("/", (req, res, next) => {
   res.send("Express Server running");
+});
+
+// in app.post: 1. handle requst, generate Date, send status(201) and Data back, 2. pass Data to update function with argument of "contact" name of the database TABLE
+app.post("/message", (req, res, next) => {
+  const body = req.body;
+  const newDateName = generateContactDate(body.name);
+  body.dateName = newDateName;
+
+  // res wird nicht ausgeführt ?!?!
+  res.status(201).send(body);
+  insertIntoDatabase("contact", body);
 });
 
 app.listen(PORT, () => {
